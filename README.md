@@ -9,7 +9,8 @@ A responsive, modern rebuild of [theroadhome.org](https://theroadhome.org/) — 
 | Path | What it is |
 |---|---|
 | `index.html` | Landing page — links to the live prototype, sitemap, brand board, and plan |
-| `stardust/pages/` | 20 browsable priority-1 pages, each responsive (desktop · tablet · mobile) |
+| `stardust/pages/` | 79 browsable pages + sitemap, each responsive (desktop · tablet · mobile) |
+| `stardust/assets/generated/` | 20 hero images generated with Gemini 3 Pro Image Preview — architectural / interior / context / atmospheric only, no fabricated portraits |
 | `stardust/pages/sitemap.html` | Every page grouped by template type |
 | `stardust/prototypes/home-b.html` | The approved home prototype (variant B) |
 | `stardust/prototypes/home-a.html` | Retained design-history variant A |
@@ -47,13 +48,13 @@ Extracted from the live site — teal-only with black + white grounds. No WordPr
 
 **Done**
 - Brand extracted, board rendered, design personality captured (all designer-authored)
-- 20 priority-1 pages rendered, linked, and responsive
+- 79 content pages rendered, linked, and responsive — covering every non-holiday, non-test page from theroadhome.org's live sitemap
+- 20 hero images generated with Gemini 3 Pro Image Preview · architectural, interior, city-context, atmospheric (no photorealistic portraits of fabricated people)
 - Home page critiqued twice and improved (Archivo + Public Sans, emergency ribbon, services asymmetry, promoted Give row, dead-link sweep)
+- Full site-wide link, image, and consistency validation · 0 issues after three side-stripe-border fixes
+- Project journal (`stardust/JOURNAL.md`) with 11 chapters + 25 closing learnings for the next site
 
-**Not yet done (covered by `stardust/PLAN2.md`)**
-- Critique pass on the other 19 priority-1 pages
-- Migration of the remaining ~64 live-site pages (priority-2 full templates + priority-3 stubs)
-- Full site-wide link, image, and consistency validation
+See `stardust/VALIDATION_REPORT.md` for the audit report and `stardust/JOURNAL.md` for the full project narrative.
 
 ## Caveats before ship
 

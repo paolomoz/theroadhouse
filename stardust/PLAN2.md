@@ -139,7 +139,127 @@ Rewrite `stardust/pages/sitemap.html` to list every rendered page — full set, 
 
 ---
 
-## Phase 3 · Site validation
+## Phase 3 · Generate hero imagery (20 images, Gemini 3 Pro Image Preview)
+
+**Goal.** Replace the Unsplash stock placeholders in the highest-visibility image slots with brand-aligned generated imagery. The generated set is **architectural, atmospheric, and contextual** — not photorealistic portraits of fabricated people.
+
+### Ethical constraint (load-bearing)
+
+This is a homeless-services nonprofit with a real 100-year reputation. Fabricating a photorealistic portrait of "a TRH client named Darnell" and shipping it as evidence of impact is a reputational landmine — if the image is later discovered to be synthetic, donor trust evaporates. The generated set therefore **excludes any photorealistic portraits of people who do not exist**.
+
+What IS generated: building exteriors, interior spaces, city context, hands at work (framed so no face is recognizable), atmospheric details (light through windows, winter streetscapes, doorway thresholds, meal trays).
+
+What is NOT generated: client portraits, staff portraits, board portraits, recognizable face-forward shots. Slots currently filled with Unsplash portraits (Darnell, Amanda, Alex & Taylor, Randall, Cory, the Nelsons, Michelle Flynn, Holly Rogers, etc.) keep their existing placeholder + `needs-real-photo: true` frontmatter flag.
+
+### Step 1 · Identify the 20 slots
+
+Candidate list, ranked by page-view-weight × visual-prominence:
+
+**Building exteriors (5):**
+1. Palmer Court — `stardust/pages/palmer-court.html` hero (also used on `about-us.html`, `give-main.html`, `housing-programs.html`)
+2. Pamela Atkinson Men's Resource Center — `mens-resource-center.html` hero + `shelter.html` location card
+3. Midvale Family Resource Center — `midvale-family-resource-center.html` hero + `shelter.html` location card
+4. Gail Miller Resource Center — `resource-centers.html` location card
+5. Connie Crosby Family Resource Center warehouse — `resource-centers.html` location card
+
+**Interior / operational (5):**
+6. Intake desk / reception at a resource center — used on `shelter.html` + `emergency-services.html` heroes
+7. Shared dining / meal service at a resource center — `get-involved.html` hero
+8. Classroom / kids' literacy-night space at Palmer Court — `palmer-court.html` volunteer band
+9. Warehouse / donation sort room at Connie Crosby — `housing-champions.html` / `item-donations.html`
+10. Housing navigator's working desk (papers, phone, computer) — `housing-programs.html` / `legacy-planned.html`
+
+**City context (4):**
+11. Downtown Salt Lake City at dusk with Wasatch backdrop — `index.html` hero (replaces current Unsplash portrait)
+12. Pioneer Park / Rio Grande neighborhood in winter — `emergency-services.html` atmospheric slot
+13. Utah wintery street scene, low light, warm window glow — `get-help.html` pillar-hero art slot
+14. Doorway threshold into a warmly-lit building, viewed from outside — `shelter.html` "A bed, a meal" illustration
+
+**Civic / institutional (3):**
+15. Audited paperwork / a 2025 Annual Report opened on a desk — `where-does-it-go.html` hero / accountability
+16. Community-board-room composition with chairs at a long table — `board-of-trustees.html` hero
+17. Centennial mark detail (1923 date stamp / century-old masonry / cornerstone) — `history.html` + `about-us.html` mission slot
+
+**Atmospheric / editorial (3):**
+18. Keys in hand with a key-ring fob marked "home" — `housing-programs.html` + `housing-stories.html`
+19. Warm coat on a hook by a door, soft morning light — `get-involved.html` moments-that-matter strip
+20. A meal tray with a hot bowl on an institutional-but-clean table — `donate.html` "$85 buys one night of shelter" moment
+
+Each image slot has a short **creative brief** derived from:
+- `brand-profile.json` → `photography.rules` and `photography.style` (muted cool tones, natural light, the teal stays the loudest color, no sepia / no pity / no golden-hour uplift)
+- `.impeccable.md` → community/human-first direction, no startup tropes, no stock-nonprofit clichés
+- The specific page's briefing → subject matter + tone
+
+### Step 2 · Invoke the image-generator skill
+
+Use the bundled `ai-image-generator` skill (available via `eds-site-builder`, `sumi`, or `testing` plugin — pick whichever is registered and has Gemini 3 Pro Image Preview support).
+
+**Configuration:**
+- `imagery_provider: gemini`
+- `imagery_model: gemini-3-pro-image-preview`
+- `imagery_credential_source: /Users/paolo/excat/vitamix-gensite/.env`
+- `output_dir: stardust/assets/generated/`
+- `output_naming: {slot-id}-{short-subject}.png`
+- `aspect_ratios: per-slot` — hero 16:9, portrait/building 4:5, detail 1:1, strip 3:2
+- `cache_by: prompt_hash` — if the run is re-invoked, don't regenerate identical prompts
+
+Never echo the credential value to stdout, logs, or provenance.
+
+**Per-image prompt template:**
+
+```
+Photograph of [subject].
+Setting: [setting — e.g. Salt Lake City winter, Palmer Court exterior, resource-center interior].
+Mood: [muted, calm, dignified, service-first; natural light; cool tones; the teal brand color stays the loudest saturated color in the frame].
+Composition: [specific — e.g. "wide shot with negative space on the left for display type overlay", "tight detail with selective focus"].
+Avoid: sepia, golden-hour uplift, hands holding hands, outstretched palms, prayer-circle compositions, stock-photo glossiness, sentimental framing, nonprofit clichés.
+Style: documentary editorial, restrained. Think Partners In Health's newer photography — dignified, specific, not triumphant.
+```
+
+For each of the 20 slots, the prompt is expanded with slot-specific subject, setting, and composition.
+
+### Step 3 · Substitute the generated images into pages
+
+For each slot:
+1. Write the generated image to `stardust/assets/generated/{slug}-{section}.png`
+2. Update the page's CSS / HTML to point at the new local path instead of the Unsplash URL
+3. Update the page's provenance block: `imagery_slot: {section} — generated via Gemini 3 Pro Image Preview on 2026-04-24, cached at {path}, prompt hash {hash}`
+4. Keep the alt text from the existing page (already authored for each slot)
+
+### Step 4 · Fallback behavior
+
+Per-slot, if generation fails:
+- **First failure** → retry once with a slightly simplified prompt (drop the longest "Avoid:" clause)
+- **Second failure** → keep the existing Unsplash placeholder for that slot; stamp `imagery_fallback: unsplash` in the provenance block; log it in `stardust/_scratch/imagery-fallbacks.json`
+- Never abort the whole phase over one image
+
+### Step 5 · Log provenance
+
+Write `stardust/assets/generated/_manifest.json` with an entry per image:
+
+```json
+{
+  "slot_id": "11",
+  "slug": "index",
+  "section": "hero-photo",
+  "path": "stardust/assets/generated/index-hero.png",
+  "prompt_hash": "a1b2c3",
+  "provider": "gemini",
+  "model": "gemini-3-pro-image-preview",
+  "generated_at": "2026-04-24T20:30:00Z",
+  "replaces_url": "https://images.unsplash.com/photo-1514894780887-121968d00567..."
+}
+```
+
+**Expected outputs:**
+- ~20 PNG files in `stardust/assets/generated/`
+- `_manifest.json` as the audit record
+- Updated HTML on the 10–14 pages that carry the top-20 image slots
+- Entry in `EXECUTION_LOG.md`: how many generated, how many fell back, total token cost (reported by the skill)
+
+---
+
+## Phase 4 · Site validation
 
 **Goal.** A concrete, auditable proof that the site is ready to hand to a stakeholder. Every link works or is flagged; every image loads or has a fallback; every page uses the shared system consistently.
 
@@ -156,7 +276,9 @@ Output: `stardust/_scratch/links-report.json` — per-page list of broken / susp
 
 ### Step 2 · Image health check
 
-Same pattern for every `<img src>` and every inline `background-image:url(...)` on every page. Local files resolved against `stardust/assets/`. External URLs (Unsplash CDN) pinged with `HEAD`. Any 4xx/5xx gets flagged.
+Same pattern for every `<img src>` and every inline `background-image:url(...)` on every page. Local files (including Phase-3 generated images at `stardust/assets/generated/`) resolved against `stardust/assets/`. External URLs (Unsplash CDN, still present on slots not in the top-20 generated set) pinged with `HEAD`. Any 4xx/5xx gets flagged.
+
+Also verify: every page that was supposed to carry a Phase-3 generated image is in fact pointing at the local `stardust/assets/generated/` path (not still the old Unsplash URL). The `_manifest.json` from Phase 3 is the source of truth for this check.
 
 Output: `stardust/_scratch/images-report.json`.
 
@@ -175,7 +297,7 @@ Output: `stardust/_scratch/consistency-report.json`.
 
 ### Step 4 · Critique sweep on random sample
 
-Pick 5 random pages from the full set and run `npx impeccable --json` on each. Any NEW antipattern that wasn't in the Phase-1 findings gets escalated.
+Pick 5 random pages from the full set and run `npx impeccable --json` on each. Any NEW antipattern that wasn't in the Phase-1 findings gets escalated. At least 2 of the 5 must be pages that received a Phase-3 generated image, so the new imagery gets a quality check in context.
 
 ### Step 5 · Apply fixes
 
@@ -192,14 +314,114 @@ Re-run steps 1–3 after fixes until the reports are clean OR the run is at its 
 `stardust/VALIDATION_REPORT.md` — a clean, stakeholder-readable summary:
 - Total pages shipped (full vs. stubbed)
 - Link health: N/N OK, M/N flagged (with the flagged list)
-- Image health: same
+- Image health: Unsplash placeholder count vs. Phase-3 generated count vs. real-TRH-asset count
 - Design consistency: any deviations + the reason they weren't fixed (if any)
+- **Imagery manifest** — the 20 Phase-3 generated images with their prompt hashes, cache paths, and the pages they appear on (cross-reference `_manifest.json`)
 - Residual known issues (e.g., "Darnell's pull-quote is fictional — must be replaced with a real client story before ship")
 - What to do before handoff to a production platform (Phase D from the original PLAN)
 
 ---
 
-## File deliverables summary
+## Phase 5 · Project journal (`stardust/JOURNAL.md`)
+
+**Goal.** A single, stakeholder-readable narrative of the entire project from the first stardust brand extraction to the final validation report — detailed enough that a second team doing a similar rebuild with the same pipeline can learn from what worked, what didn't, and what to do differently. This is the last artifact written in the run.
+
+### Structure
+
+The journal is written as a chronological story, not a changelog. Each chapter names the session, the decisions made, and the artifacts produced. Each chapter ends with 2–5 **learnings** — what to keep, what to drop, what to do differently next time.
+
+**Required chapters, in order:**
+
+1. **Starting point — "I want to rebuild this old site"**
+   - The conversation that produced the goal
+   - Why stardust was picked over a one-shot design tool
+   - What the site looked like on day one (the live theroadhome.org — WordPress, WPBakery, 2020-era aesthetic, three failure modes: Lorem ipsum on key pages, four stacked DONATE buttons, phone-tree navigation)
+   - Learnings on how to frame a redesign brief
+
+2. **Brand extraction with stardust**
+   - What the Playwright scrape actually captured vs missed
+   - Which root tokens turned out to be WP theme defaults (pink, cream) vs real brand (teal family)
+   - Voice examples pulled from live copy — why that beat synthesizing them
+   - Logo download path, motif identification
+   - Learnings: always drive a real browser, always look at computed styles not just inline tokens, always interrogate root-variable palettes against rendered CSS
+
+3. **Design personality (`.impeccable.md`)**
+   - The three inline questions (references, dislikes, one rule to bend)
+   - Why "skip" produced a stronger `.impeccable.md` than "synthesize" would have
+   - How Partners In Health-style references + "no startup tropes / no stock nonprofit clichés" shaped every downstream decision
+   - Learnings: the personality document is a real quality gate, not a formality; spending three minutes on it changes the output profoundly
+
+4. **Home prototype — variants A and B**
+   - Why we picked 2 variants not 1 (load-bearing direction axis)
+   - Variant A = editorial / portrait-led / airy; Variant B = civic / data-led / dense
+   - What drove the choice (civic register fit TRH's 100-year-institution register better than editorial warmth)
+   - Learnings: present clearly distinct directions, not A/A'; commit to a register before iterating on details
+
+5. **Responsive by default — rule added mid-session**
+   - The prototype shipped desktop-only per stardust default; user pushed back immediately
+   - How the fix propagated through `.impeccable.md` ("no prototype is considered complete if it only renders at 1440px") and later `_tokens.css` responsive breakpoints
+   - Learnings: the stardust default of desktop-only at 1440 is wrong for any modern deliverable; the personality document should inherit responsive as a hard rule from day one
+
+6. **The first plan — 84 pages, 15 templates**
+   - How the sitemap crawl surfaced the real IA (not the nav)
+   - Why 84 pages reduced to 15 templates (the architecture was repetitive, the redesign is not)
+   - Priority-1 / priority-2 / priority-3 split
+   - Learnings: always crawl the sitemap before estimating; page count is not template count; a WordPress site's IA is almost always over-branched and simplifies dramatically
+
+7. **Autonomous execution — Phase 1 of the work**
+   - What got built in one autonomous run: shared tokens CSS, 9 template prototypes, 10 derivatives, sitemap, landing, briefings
+   - What went well: template-first rendering, token-sharing via `@import`, one-shot briefing authoring from the scrape JSON
+   - What surprised us: Lorem ipsum on `/emergency-services/` and `/where-does-it-go/`, `/palmer-court/` being a volunteer page in disguise, repeated disclaimer boilerplate leaking across unrelated pages
+   - Learnings: always read what's on the source site before trusting its IA; `copy_edited: true` with a reason is cheap and load-bearing
+
+8. **The first critique (home page only)**
+   - Dual-pass — sub-agent design review + `npx impeccable --json` detector
+   - Findings summary: 24 / 40 on Nielsen; Inter as display + body was the loudest AI-slop tell; triage buried below the hero; services grid symmetric; `href="#"` everywhere; Give row cold
+   - How we fixed: Archivo + Public Sans + Source Serif 4 (none on reflex-reject), emergency ribbon, services asymmetry, Give-row promotion, dead-link sweep
+   - Learnings: detector false-positives on contrast inside dark sections are noise but the font + structural findings are gold; critique before migrating the rest is correct sequencing (the fixes propagate)
+
+9. **GitHub publication**
+   - Why private first, then public (licensing implications of scraped copy + fictional client pull-quotes)
+   - The decision to ship `README.md` that names the caveats loudly
+   - Learnings: a README that is honest about what's fake and what's real is more useful than a README that performs finished-ness
+
+10. **Phase 2 — critique rest + migrate rest + generate imagery + validate**
+    - Sampled critique on 9 representatives vs per-page critique on 19 — why sampling was correct
+    - Building the 4 new templates (T-08 Person, T-10 Get-involved program, T-13 History, T-15 Legal)
+    - ~40 priority-2 pages rendered from templates, ~24 priority-3 pages stubbed
+    - Phase 3 imagery generation with Gemini 3 Pro Image Preview — 20 slots, architectural/atmospheric not photorealistic portraits
+    - Phase 4 validation — link health, image health, consistency sweep, random-sample critique
+    - Learnings from each step
+
+11. **Closing learnings — for the next site**
+
+   A distilled playbook. Bullet form. Not essay form. Examples of what should appear:
+   - "Invoke stardust only after the sitemap has been crawled — never estimate from a nav menu"
+   - "Responsive is a rule, not a Phase-2 polish task"
+   - "Pick distinctive display + body fonts on day one; the reflex-reject list is binding"
+   - "Dead-link hardening is mechanical and belongs in the renderer, not a post-critique fix"
+   - "Don't generate portraits of fabricated people, ever"
+   - "Write `copy_edited: true` with a reason; the cheap audit trail saves you the expensive one"
+   - "Samples beat full passes for critique on repetitive templates"
+   - "Lorem ipsum on a production nonprofit site is more common than expected — assume it"
+   - "Ship a JOURNAL.md on day one of the next project, not at the end"
+
+   Target: 15–25 concrete, reusable lessons. Each lesson is one sentence, action-oriented, grounded in a specific thing that happened on this project.
+
+### Writing style
+
+- First-person plural ("we"), past tense
+- Each chapter titled with the session's real name or goal, not "Step 4.2.1"
+- Timestamps where meaningful ("one autonomous run, roughly 90 minutes")
+- Quote specific hexes, file paths, font names, page slugs — not abstractions
+- Do not repeat the plan; tell the *story* of executing the plan
+- Call out dead ends and bad ideas we tried and abandoned — those are the most valuable pages
+
+**Expected length:** 2,500–4,000 words. If it's shorter than 2,000 the chapters are too thin; if it's longer than 5,000 the writing is not doing its job.
+
+**Output:** `stardust/JOURNAL.md`. Final commit after validation.
+
+---
 
 By the end of the run, the tree should look like:
 
@@ -212,9 +434,13 @@ theroadhouse/
 │   ├── brand-board.html
 │   ├── PLAN.md                                   ← original plan
 │   ├── PLAN2.md                                  ← this document
-│   ├── EXECUTION_LOG.md                          ← appended with Phase-1/2/3 notes
+│   ├── EXECUTION_LOG.md                          ← appended with Phase-1/2/3/4 notes
 │   ├── VALIDATION_REPORT.md                      ← new · stakeholder-readable
+│   ├── JOURNAL.md                                ← new · full project narrative + lessons
 │   ├── assets/
+│   │   ├── logo.png
+│   │   ├── pages/                                ← scraped TRH imagery (existing)
+│   │   └── generated/                            ← NEW · 20 Gemini-generated images + _manifest.json
 │   ├── briefings/                                ← grows to ~83 files
 │   ├── prototypes/
 │   │   ├── _tokens.css                           ← may gain fixes from Phase 1
@@ -237,6 +463,9 @@ theroadhouse/
 - A single page blocks the render (asset fetch loop, bad content from the scraper) → skip it with a log entry, keep going.
 - Playwright blocked by the source site repeatedly → fall back to serving whatever content the Phase-1 scrape already captured; do not re-attempt per page beyond 3 retries.
 - A new antipattern that triggers a `/typeset`-level redesign mid-run → defer that fix to the validation report as a recommendation, do not attempt to re-typeset mid-run.
+- Gemini 3 Pro Image Preview API rejects > 5 prompts consecutively (rate-limit, credential expired, etc.) → stop Phase 3 early, keep the successfully generated images, fall back to Unsplash for the rest, log the cutoff point, and continue to Phase 4 validation on what's there.
+- The credential at `/Users/paolo/excat/vitamix-gensite/.env` is missing or malformed → skip Phase 3 entirely, proceed to Phase 4 with Unsplash in place, and flag this prominently in `VALIDATION_REPORT.md` so the stakeholder knows imagery generation was deferred.
+- If any earlier phase stops short, Phase 5 (journal) still runs — it writes the story of what we did, including the stop point. Shipping without a journal is not an option.
 
 ---
 
@@ -247,6 +476,7 @@ theroadhouse/
 - I will not migrate blog posts, individual story pages, or individual team-member detail pages beyond what's in `page-sitemap.xml` (the team/story sitemaps contain a separate long tail that's out of scope for this run).
 - I will not implement real form submission, payment integration, CMS wiring, platform handoff, or production image optimization. Those remain Phase-D concerns.
 - I will not produce marketing copy, campaign pages, or fundraising event pages beyond what the live site already carries.
+- **I will not generate photorealistic portraits of fabricated people**, regardless of how much easier it would make the page look. Client, staff, and board portraits stay flagged for human replacement. Phase-3 imagery is architectural, atmospheric, and contextual only.
 
 ---
 
